@@ -52,7 +52,11 @@ model Order {
   total     Float
   status    String   @default("pending")
   createdAt DateTime @default(now())
+
+  // 🔹 Relación con Factura
+  invoice   Invoice?
 }
+
 
 model User {
   id        String   @id @default(uuid())
@@ -72,3 +76,29 @@ model Category {
   name     String    @unique
   products Product[]
 }
+// 📌 Modelo de Facturas
+model Invoice {
+  id            String   @id @default(uuid())
+  orderId       String   @unique
+  invoiceNumber String   @unique
+  clientName    String
+  clientEmail   String
+  items         Json
+  subtotal      Float
+  tax           Float
+  total         Float
+  status        String   @default("pending") // Estado: pending / paid
+  createdAt     DateTime @default(now())
+
+  order         Order    @relation(fields: [orderId], references: [id])
+}
+
+model Config {
+  id           String  @id @default(uuid())
+  invoiceStart Int     @default(1000) // Número inicial de facturas
+  taxRate      Float   @default(21.0) // IVA en porcentaje
+  invoiceEmail String  @default("facturas@tuempresa.com") // Email de facturación
+  orderEmail   String  @default("pedidos@tuempresa.com") 
+  contactEmail String  @default("contacto@tuempresa.com") 
+}
+
