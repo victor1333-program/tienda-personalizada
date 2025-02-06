@@ -4,16 +4,15 @@
 import { ReactNode } from "react";
 import AdminSidebar from "@/components/AdminSidebar";
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex">
-      {/* 🔹 Barra lateral fija */}
-      <AdminSidebar />
-
-      {/* 🔹 Contenido principal */}
-      <main className="flex-1 p-6">
-        {children}
-      </main>
-    </div>
+    <html lang="es">
+      <body>
+        <div className="flex">
+          <AdminSidebar />
+          <main className="flex-1 p-6">{children}</main>
+        </div>
+      </body>
+    </html>
   );
 }
