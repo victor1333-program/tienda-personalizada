@@ -19,3 +19,21 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+main {
+  flex: 1;
+  padding: 20px;
+  min-height: 100vh;
+  overflow: auto; /* ✅ Evita problemas de scroll */
+}
+aside {
+  width: 250px;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background-color: #1a202c;
+}
+.page-content {
+  margin-left: 250px; /* ✅ Ajusta la posición */
+  padding: 20px;
+}

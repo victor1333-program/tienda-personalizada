@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import "@/globals.css"; // Importar estilos globales
+import "@/styles/globals.css"; // Importar estilos globales
 import AdminSidebar from "@/components/AdminSidebar";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
