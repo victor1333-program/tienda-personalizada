@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { PDFViewer } from "@react-pdf/renderer";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import "jspdf-autotable"; // 👈 Necesario para que TypeScript reconozca lastAutoTable
 import InvoicePDF from "@/components/InvoicePDF"; // ✅ Componente de vista previa en PDF
 
 interface Invoice {

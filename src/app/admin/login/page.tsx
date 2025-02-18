@@ -1,45 +1,79 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-export default function AdminLogin() {
-  const router = useRouter();
+export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === "admin@loviprint.com" && password === "admin123") {
-      router.push("/admin/dashboard");
-    } else {
-      alert("Credenciales incorrectas");
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (res.ok) {
+        router.push("/admin");
+      } else {
+        const data = await res.json();
+        setError(data.error || "❌ Error al iniciar sesión");
+      }
+    } catch {
+      setError("❌ Error al conectar con el servidor");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="flex justify-center items-center h-screen bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-96">
-        <h2 className="text-2xl font-bold text-center mb-6">Admin Login</h2>
-        <form onSubmit={handleLogin} className="flex flex-col space-y-4">
+    <div className="flex items-center justify-center h-screen">
+      <div className="bg-white p-6 rounded shadow-md w-96">
+        <h1 className="text-xl font-bold mb-4 text-center">🔐 Admin Login</h1>
+        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
+        <form onSubmit={handleLogin} className="space-y-3">
           <input
             type="email"
-            placeholder="Email"
-            className="p-2 border rounded"
+            placeholder="Correo electrónico"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full p-2 border rounded"
+            required
           />
           <input
             type="password"
             placeholder="Contraseña"
-            className="p-2 border rounded"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="w-full p-2 border rounded"
+            required
           />
-          <button type="submit" className="bg-blue-500 text-white p-2 rounded">
-            Iniciar Sesión
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-500"
+            disabled={loading}
+          >
+            {loading ? "Iniciando..." : "Iniciar Sesión"}
           </button>
         </form>
+
+        {/* Enlace para recuperar contraseña */}
+        <div className="mt-4 text-center">
+          <Link href="/admin/recover-password" className="text-blue-600 hover:underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

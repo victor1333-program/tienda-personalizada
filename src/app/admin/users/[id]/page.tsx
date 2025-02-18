@@ -1,36 +1,99 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+"use client";
 
-// 📥 Obtener un usuario por ID
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: params.id },
-    });
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-    if (!user) {
-      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+interface Params {
+  id: string;
+}
+
+export default function EditUserPage({ params }: { params: Params }) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<"admin" | "cliente">("cliente");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const userId = params?.id;
+    if (!userId) {
+      setError("❌ ID de usuario inválido.");
+      return;
     }
 
-    return NextResponse.json(user);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al obtener usuario" }, { status: 500 });
-  }
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`/api/users/${userId}`);
+        if (!res.ok) throw new Error("No se pudo obtener el usuario.");
+        const data = await res.json();
+        setName(data.name);
+        setRole(data.role);
+      } catch {
+        setError("❌ Error al cargar el usuario.");
+      }
+    };
+
+    fetchUser();
+  }, [params?.id]);
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !role.trim()) {
+      setError("Todos los campos son obligatorios.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/users/${params?.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, role }),
+      });
+
+      if (!res.ok) throw new Error("Error al actualizar el usuario");
+      router.push("/admin/users");
+    } catch {
+      setError("❌ No se pudo actualizar el usuario.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-6 bg-white shadow rounded-lg">
+      <h1 className="text-2xl font-bold mb-4">Editar Usuario</h1>
+      {error && <p className="text-red-600">{error}</p>}
+
+      <form onSubmit={handleUpdate}>
+        <label className="block mb-2 font-semibold">Nombre:</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full border px-3 py-2 rounded-lg mb-4"
+          required
+        />
+
+        <label className="block mb-2 font-semibold">Rol:</label>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as "admin" | "cliente")}
+          className="w-full border px-3 py-2 rounded-lg mb-4"
+          required
+        >
+          <option value="admin">Administrador</option>
+          <option value="cliente">Cliente</option>
+        </select>
+
+        <button
+          type="submit"
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-500"
+          disabled={loading}
+        >
+          {loading ? "Actualizando..." : "Actualizar Usuario"}
+        </button>
+      </form>
+    </div>
+  );
 }
-
-// 📤 Actualizar usuario
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  try {
-    const { name, role, isActive } = await req.json();
-
-    const updatedUser = await prisma.user.update({
-      where: { id: params.id },
-      data: { name, role, isActive },
-    });
-
-    return NextResponse.json(updatedUser);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al actualizar usuario" }, { status: 500 });
-  }
-}
-

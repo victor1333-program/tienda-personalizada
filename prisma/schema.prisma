@@ -8,75 +8,89 @@ datasource db {
 }
 
 model Product {
-  id          String    @id @default(uuid())
-  name        String
-  description String?
-  price       Float
-  stock       Int
-  categoryId  String?
-  category    Category? @relation(fields: [categoryId], references: [id])
-  images      String[] // 🖼️ Varias imágenes
-  colors      String[] // 🎨 Lista de colores disponibles
-  sizes       String[] // 📏 Lista de tallas disponibles
-  material    String?
-  weight      Float? // ⚖️ Peso del producto
-  dimensions  String? // 📐 Dimensiones (Ejemplo: "30x20x10 cm")
-  isActive    Boolean   @default(true) // ✅ Si está activo, aparece en la tienda
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  price            Float
+  stock            Int
+  minStock         Int
+  sku              String   @unique
+  categoryId       String?
+  images           String[]
+  colors           String[]
+  sizes            String[]
+  material         String?
+  weight           Float?
+  dimensions       String?
+  isActive         Boolean  @default(true)
+  isCustomizable   Boolean  @default(false)
+  allowImageUpload Boolean  @default(false)
+  customTextFields String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
 
-  // Personalización 🔥
-  isCustomizable   Boolean  @default(false) // ✏️ ¿Se puede personalizar?
-  allowImageUpload Boolean  @default(false) // 📸 ¿Se puede subir imagen personalizada?
-  customTextFields String[] // 📝 Campos de texto personalizados (Ejemplo: "Nombre", "Número")
-
-  variants  Variant[] // 🔗 Relación con variantes
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @default(now()) @updatedAt
+  category         Category?          @relation(fields: [categoryId], references: [id])
+  variants         Variant[]
+  suppliers        ProductSupplier[]
+  inventoryHistory InventoryHistory[]
 }
 
 model Variant {
   id        String   @id @default(uuid())
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  color     String // 🎨 Color de la variante
-  size      String // 📏 Talla de la variante
-  stock     Int // 📦 Stock por variante
-  price     Float? // 💰 Precio opcional si la variante tiene otro precio
+  color     String
+  size      String
+  stock     Int
+  price     Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
 }
 
 model Order {
   id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
   userId    String
   total     Float
   status    String   @default("pending")
   createdAt DateTime @default(now())
 
-  // 🔹 Relación con Factura
-  invoice   Invoice?
+  invoice Invoice?
+  user    User     @relation(fields: [userId], references: [id])
 }
 
-
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      String   @default("user")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id                 String   @id @default(uuid())
+  name               String
+  email              String   @unique
+  password           String
+  role               String   @default("user")
+  isActive           Boolean  @default(true)
+  resetPasswordToken String?
+  createdAt          DateTime @default(now())
 
-  // 🔹 Relación inversa con Order (un usuario puede tener varios pedidos)
   orders Order[]
 }
 
 model Category {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  products Product[]
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  products Product[] // Relación inversa con Product
+  images   GalleryImage[] // Relación con las imágenes de la galería
 }
-// 📌 Modelo de Facturas
+
+model GalleryImage {
+  id         String   @id @default(uuid())
+  imageUrl   String
+  title      String
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  category Category @relation(fields: [categoryId], references: [id])
+}
+
 model Invoice {
   id            String   @id @default(uuid())
   orderId       String   @unique
@@ -87,18 +101,61 @@ model Invoice {
   subtotal      Float
   tax           Float
   total         Float
-  status        String   @default("pending") // Estado: pending / paid
+  status        String   @default("pending")
   createdAt     DateTime @default(now())
 
-  order         Order    @relation(fields: [orderId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
 }
 
 model Config {
-  id           String  @id @default(uuid())
-  invoiceStart Int     @default(1000) // Número inicial de facturas
-  taxRate      Float   @default(21.0) // IVA en porcentaje
-  invoiceEmail String  @default("facturas@tuempresa.com") // Email de facturación
-  orderEmail   String  @default("pedidos@tuempresa.com") 
-  contactEmail String  @default("contacto@tuempresa.com") 
+  id           String @id @default(uuid())
+  invoiceStart Int    @default(1000)
+  taxRate      Float  @default(21.0)
+  orderEmail   String @default("pedidos@tuempresa.com")
+  contactEmail String @default("contacto@tuempresa.com")
+  invoiceEmail String @default("facturas@tuempresa.com")
 }
 
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String
+  contact   String?
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+
+  products ProductSupplier[]
+}
+
+model ProductSupplier {
+  productId  String
+  supplierId String
+  cost       Float
+
+  product  Product  @relation(fields: [productId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@id([productId, supplierId])
+}
+
+model InventoryHistory {
+  id          String   @id @default(uuid())
+  productId   String
+  type        String // entrada o salida
+  quantity    Int
+  userId      String
+  description String?
+  createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model AdminUser {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+}

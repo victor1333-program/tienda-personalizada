@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function AddCategoryPage() {
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -17,6 +17,8 @@ export default function AddCategoryPage() {
     }
 
     setLoading(true);
+    setError(null); // Resetear error antes de enviar
+
     try {
       const res = await fetch("/api/categories", {
         method: "POST",
@@ -24,11 +26,14 @@ export default function AddCategoryPage() {
         body: JSON.stringify({ name }),
       });
 
-      if (!res.ok) throw new Error("Error al agregar la categoría");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData?.message || "Error al agregar la categoría");
+      }
 
       router.push("/admin/categories");
     } catch (error) {
-      setError("❌ No se pudo agregar la categoría.");
+      setError(error instanceof Error ? error.message : "❌ No se pudo agregar la categoría.");
     } finally {
       setLoading(false);
     }

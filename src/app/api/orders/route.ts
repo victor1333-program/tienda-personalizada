@@ -1,3 +1,5 @@
+import prisma from "@/lib/prisma";
+
 // ✅ Marcar un pedido como "Completado" y generar factura
 export async function PATCH(req: Request) {
   try {
@@ -9,7 +11,11 @@ export async function PATCH(req: Request) {
       data: { status: "completed" },
       include: { user: true, items: true },
     });
-
+        // ✅ Verifica que haya pedidos antes de responder
+        if (!orders || orders.length === 0) {
+          return NextResponse.json({ message: "No hay pedidos aún." }, { status: 200 });
+        }
+        
     // 📌 Generamos la factura automáticamente
     await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invoices`, {
       method: "POST",
@@ -24,6 +30,8 @@ export async function PATCH(req: Request) {
         total: updatedOrder.total * 1.21,
       }),
     });
+
+
 
     return NextResponse.json({ message: "Pedido completado y factura generada" });
   } catch (error) {

@@ -1,234 +1,271 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { FiPlusCircle, FiEdit, FiTrash2 } from "react-icons/fi";
 
-export default function AddProductPage() {
-  const router = useRouter();
-  const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  imageUrl?: string;
+  stock: number;
+  price: number;
+  category: string;
+  provider: string;
+  isActive: boolean;
+}
 
-  const [formData, setFormData] = useState(() => {
-    if (typeof window !== "undefined") {
-      return JSON.parse(localStorage.getItem("productForm") || "{}") || {
-        name: "",
-        description: "",
-        price: "",
-        stock: "",
-        categoryId: "",
-        images: [],
-        colors: [],
-        sizes: [],
-        material: "",
-        weight: "",
-        dimensions: "",
-        isActive: true,
-        isCustomizable: false,
-        allowImageUpload: false,
-        customTextFields: ["", "", ""],
-        variants: [],
-      };
-    }
-    return {};
-  });
+export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterProvider, setFilterProvider] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [actionType, setActionType] = useState<"activate" | "deactivate" | "delete" | null>(null);
 
-  // Guardar datos en localStorage para evitar perderlos
+  // 🔄 Cargar productos al montar
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("productForm", JSON.stringify(formData));
+    async function loadProducts() {
+      const res = await fetch("/api/products", { method: "GET" });
+    
+      if (!res.ok) throw new Error(`Error: ${res.status}`);
+    
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
     }
-  }, [formData]);
-
-  // Cargar categorías
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await fetch("/api/categories");
-        const data = await res.json();
-        setCategories(data);
-      } catch (error) {
-        console.error("❌ Error al cargar categorías:", error);
-      }
-    }
-    fetchCategories();
+    
+    loadProducts();
   }, []);
 
-  // Manejo de cambios en los inputs
-  const handleChange = (e: any) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  // 🔍 Filtrar productos dinámicamente
+  const filteredProducts = products.filter((p) => {
+    return (
+      (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.includes(search)) &&
+      (filterCategory ? p.category === filterCategory : true) &&
+      (filterProvider ? p.provider === filterProvider : true) &&
+      (filterStatus === "active" ? p.isActive : filterStatus === "inactive" ? !p.isActive : true)
+    );
+  });
+
+  // ✅ Seleccionar productos
+  const toggleSelect = (id: string) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
   };
 
-  // Vista previa de imagen
-  const handleImageChange = (e: any) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImagePreview(URL.createObjectURL(file));
-      setFormData((prev) => ({
-        ...prev,
-        images: [file],
-      }));
-    }
-  };
+  // 🔧 Acciones Masivas
+  const handleAction = async () => {
+    if (!actionType) return;
+    const confirm = window.confirm(`¿Estás seguro de querer ${actionType} los productos seleccionados?`);
+    if (!confirm) return;
 
-  // Validaciones antes de enviar
-  const validateForm = () => {
-    if (!formData.name || !formData.price || !formData.stock) {
-      alert("❌ Debes completar los campos obligatorios.");
-      return false;
-    }
-    if (Number(formData.price) <= 0) {
-      alert("❌ El precio debe ser mayor que 0.");
-      return false;
-    }
-    if (Number(formData.stock) < 0) {
-      alert("❌ El stock no puede ser negativo.");
-      return false;
-    }
-    return true;
-  };
-
-  // Enviar formulario
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (!res.ok) throw new Error("Error al agregar el producto");
-
-      localStorage.removeItem("productForm"); // Limpiar localStorage después de guardar
-      router.push("/admin/products");
-    } catch (error) {
-      console.error("❌ Error al agregar producto:", error);
-    } finally {
-      setLoading(false);
+    const res = await fetch("/api/products/bulk-action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: actionType, productIds: selected }),
+    });
+    if (res.ok) {
+      alert(`✅ Productos ${actionType === "delete" ? "eliminados" : "actualizados"} correctamente`);
+      const updated = products.filter((p) => !selected.includes(p.id));
+      setProducts(updated);
+      setSelected([]);
+      setActionType(null);
+    } else {
+      alert("❌ Error al realizar la acción masiva");
     }
   };
 
+  // 🖱️ Renderizar productos
   return (
-    <div className="p-6 bg-white shadow rounded-lg">
-      <h1 className="text-2xl font-bold mb-4">Agregar Producto</h1>
-
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Nombre */}
-        <div>
-          <label className="block text-gray-700">Nombre *</label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-          />
-        </div>
-
-        {/* Descripción */}
-        <div>
-          <label className="block text-gray-700">Descripción</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          />
-        </div>
-
-        {/* Precio */}
-        <div>
-          <label className="block text-gray-700">Precio *</label>
-          <input
-            type="number"
-            name="price"
-            value={formData.price}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-            min="0.01"
-          />
-        </div>
-
-        {/* Stock */}
-        <div>
-          <label className="block text-gray-700">Stock *</label>
-          <input
-            type="number"
-            name="stock"
-            value={formData.stock}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-            min="0"
-          />
-        </div>
-
-        {/* Categoría */}
-        <div>
-          <label className="block text-gray-700">Categoría *</label>
-          <select
-            name="categoryId"
-            value={formData.categoryId}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-          >
-            <option value="">Seleccionar categoría</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Imagen */}
-        <div>
-          <label className="block text-gray-700">Imagen</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="w-full border p-2 rounded"
-          />
-          {imagePreview && (
-            <img src={imagePreview} alt="Vista previa" className="mt-2 w-32 h-32 object-cover" />
-          )}
-        </div>
-
-        {/* Activo */}
-        <div className="col-span-2 flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="isActive"
-            checked={formData.isActive}
-            onChange={handleChange}
-          />
-          <label className="text-gray-700">Producto Activo</label>
-        </div>
-
-        {/* Botón de Enviar */}
-        <div className="col-span-2">
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-500"
-            disabled={loading}
-          >
-            {loading ? "Guardando..." : "Agregar Producto"}
+    <main className="p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">🛒 Gestión de Productos</h1>
+        <Link href="/admin/products/add">
+          <button className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-500">
+            <FiPlusCircle /> Agregar Producto
           </button>
-        </div>
-      </form>
-    </div>
+        </Link>
+      </div>
+
+      {/* 🔍 Filtros */}
+      <div className="flex gap-4 mb-4">
+        <input
+          type="text"
+          placeholder="🔍 Buscar por nombre o SKU"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border px-3 py-2 rounded w-1/4"
+        />
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className="border px-3 py-2 rounded"
+        >
+          <option value="">📂 Filtrar por categoría</option>
+          <option value="Camisetas">Camisetas</option>
+          <option value="Tazas">Tazas</option>
+          <option value="Accesorios">Accesorios</option>
+        </select>
+
+        <select
+          value={filterProvider}
+          onChange={(e) => setFilterProvider(e.target.value)}
+          className="border px-3 py-2 rounded"
+        >
+          <option value="">🏭 Filtrar por proveedor</option>
+          <option value="Proveedor A">Proveedor A</option>
+          <option value="Proveedor B">Proveedor B</option>
+        </select>
+
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="border px-3 py-2 rounded"
+        >
+          <option value="">⚙️ Filtrar por estado</option>
+          <option value="active">✅ Activos</option>
+          <option value="inactive">❌ Inactivos</option>
+        </select>
+      </div>
+
+      {/* 🛠️ Acciones Masivas */}
+      <div className="flex gap-3 mb-4">
+        <button
+          className="bg-green-600 text-white px-3 py-2 rounded disabled:opacity-50"
+          disabled={selected.length === 0}
+          onClick={() => {
+            setActionType("activate");
+            handleAction();
+          }}
+        >
+          🟢 Activar
+        </button>
+        <button
+          className="bg-yellow-600 text-white px-3 py-2 rounded disabled:opacity-50"
+          disabled={selected.length === 0}
+          onClick={() => {
+            setActionType("deactivate");
+            handleAction();
+          }}
+        >
+          🟡 Desactivar
+        </button>
+        <button
+          className="bg-red-600 text-white px-3 py-2 rounded disabled:opacity-50"
+          disabled={selected.length === 0}
+          onClick={() => {
+            setActionType("delete");
+            handleAction();
+          }}
+        >
+          🔴 Eliminar
+        </button>
+      </div>
+
+      {/* 📋 Tabla de Productos */}
+      <table className="w-full border-collapse border text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="p-2">
+              <input
+                type="checkbox"
+                onChange={(e) =>
+                  setSelected(
+                    e.target.checked ? products.map((p) => p.id) : []
+                  )
+                }
+              />
+            </th>
+            <th className="p-2">🖼️ Imagen</th>
+            <th className="p-2 text-left">🏷️ Nombre</th>
+            <th className="p-2 text-left">🔍 SKU</th>
+            <th className="p-2">⚖️ Inventario</th>
+            <th className="p-2">💲 Precio</th>
+            <th className="p-2">📂 Categoría</th>
+            <th className="p-2">🏭 Proveedor</th>
+            <th className="p-2">⚙️ Estado</th>
+            <th className="p-2">🔧 Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredProducts.length > 0 ? (
+            filteredProducts.map((product) => (
+              <tr
+                key={product.id}
+                className="hover:bg-gray-50 border-t cursor-pointer"
+              >
+                <td className="p-2 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(product.id)}
+                    onChange={() => toggleSelect(product.id)}
+                  />
+                </td>
+                <td className="p-2 text-center">
+                  {product.imageUrl ? (
+                    <Image
+                      src={product.imageUrl}
+                      alt={product.name}
+                      width={50}
+                      height={50}
+                      className="rounded"
+                    />
+                  ) : (
+                    "❌"
+                  )}
+                </td>
+                <td className="p-2 text-left">
+                  <Link
+                    href={`/admin/products/edit/${product.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {product.name}
+                  </Link>
+                </td>
+                <td className="p-2">{product.sku}</td>
+                <td className="p-2 text-center">{product.stock}</td>
+                <td className="p-2 text-center">€{product.price.toFixed(2)}</td>
+                <td className="p-2 text-center">{product.category}</td>
+                <td className="p-2 text-center">{product.provider}</td>
+                <td className="p-2 text-center">
+                  {product.isActive ? "✅ Activo" : "❌ Inactivo"}
+                </td>
+                <td className="p-2 text-center">
+                  <Link href={`/admin/products/edit/${product.id}`}>
+                    <button className="bg-yellow-500 text-white p-2 rounded mr-2 hover:bg-yellow-400">
+                      <FiEdit />
+                    </button>
+                  </Link>
+                  <button
+                    className="bg-red-600 text-white p-2 rounded hover:bg-red-500"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `¿Eliminar el producto "${product.name}"?`
+                        )
+                      ) {
+                        handleAction();
+                      }
+                    }}
+                  >
+                    <FiTrash2 />
+                  </button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={10} className="text-center p-4">
+                ❌ No se encontraron productos.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </main>
   );
 }

@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+// 🔹 Tipado de datos esperados en `PUT`
+interface UserUpdateRequest {
+  name?: string;
+  role?: "admin" | "user"; // Solo estos roles permitidos
+  isActive?: boolean;
+}
+
 // 📥 Obtener un usuario por ID
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
   try {
     const user = await prisma.user.findUnique({
       where: { id: params.id },
@@ -14,35 +24,44 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
     return NextResponse.json(user);
   } catch (error) {
-    return NextResponse.json({ error: "Error al obtener usuario" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+    return NextResponse.json({ error: `Error al obtener usuario: ${errorMessage}` }, { status: 500 });
   }
 }
 
 // 📤 Actualizar usuario
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
   try {
-    const { name, role, isActive } = await req.json();
+    const body: UserUpdateRequest = await req.json();
 
     const updatedUser = await prisma.user.update({
       where: { id: params.id },
-      data: { name, role, isActive },
+      data: body,
     });
 
     return NextResponse.json(updatedUser);
   } catch (error) {
-    return NextResponse.json({ error: "Error al actualizar usuario" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+    return NextResponse.json({ error: `Error al actualizar usuario: ${errorMessage}` }, { status: 500 });
   }
 }
-// 🚮 Eliminar usuario por ID
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-    try {
-      await prisma.user.delete({
-        where: { id: params.id },
-      });
-  
-      return NextResponse.json({ message: "Usuario eliminado correctamente" });
-    } catch (error) {
-      return NextResponse.json({ error: "Error al eliminar usuario" }, { status: 500 });
-    }
-  }
 
+// 🚮 Eliminar usuario por ID
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    await prisma.user.delete({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({ message: "Usuario eliminado correctamente" });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+    return NextResponse.json({ error: `Error al eliminar usuario: ${errorMessage}` }, { status: 500 });
+  }
+}

@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 
+interface Order {
+  id: string;
+  createdAt: string;
+  total: number;
+}
+
 export default function UserOrders({ userId }: { userId: string }) {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     async function fetchOrders() {
       try {
         const res = await fetch(`/api/orders?userId=${userId}`);
-        const data = await res.json();
+        const data: Order[] = await res.json();
         setOrders(data);
       } catch (error) {
         console.error("❌ Error al obtener pedidos:", error);
@@ -25,9 +31,16 @@ export default function UserOrders({ userId }: { userId: string }) {
         <ul className="space-y-2">
           {orders.map((order) => (
             <li key={order.id} className="border p-2 rounded-lg shadow-sm">
-              <p><strong>ID:</strong> {order.id}</p>
-              <p><strong>Fecha:</strong> {new Date(order.createdAt).toLocaleDateString()}</p>
-              <p><strong>Total:</strong> ${order.total}</p>
+              <p>
+                <strong>ID:</strong> {order.id}
+              </p>
+              <p>
+                <strong>Fecha:</strong>{" "}
+                {new Date(order.createdAt).toLocaleDateString()}
+              </p>
+              <p>
+                <strong>Total:</strong> ${order.total.toFixed(2)}
+              </p>
             </li>
           ))}
         </ul>

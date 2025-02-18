@@ -4,15 +4,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiEdit, FiTrash2, FiPlusCircle } from "react-icons/fi";
 
+interface Category {
+  id: string;
+  name: string;
+}
+
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     async function fetchCategories() {
       try {
         const res = await fetch("/api/categories");
-        const data = await res.json();
+        if (!res.ok) throw new Error("Error al obtener categorías");
+        const data: Category[] = await res.json();
         setCategories(data);
       } catch (error) {
         console.error("❌ Error al obtener categorías:", error);
@@ -26,8 +32,10 @@ export default function CategoriesPage() {
 
     setLoading(true);
     try {
-      await fetch(`/api/categories/${id}`, { method: "DELETE" });
-      setCategories(categories.filter((category) => category.id !== id));
+      const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Error al eliminar categoría");
+
+      setCategories((prev) => prev.filter((category) => category.id !== id));
     } catch (error) {
       console.error("❌ Error al eliminar categoría:", error);
     } finally {
@@ -67,6 +75,7 @@ export default function CategoriesPage() {
                 <button
                   onClick={() => handleDelete(category.id)}
                   className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-500"
+                  disabled={loading}
                 >
                   <FiTrash2 />
                 </button>

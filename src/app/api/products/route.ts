@@ -1,13 +1,23 @@
+// src/app/api/products/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { v4 as uuidv4 } from "uuid";
 
-// 🔥 Obtener todos los productos
+// ✅ Método GET: Obtener lista de productos
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
-      include: { category: true, variants: true },
+      include: {
+        category: true,
+        suppliers: true,
+        variants: true,
+      },
     });
-    console.log("✅ Productos obtenidos:", products);
+
+    if (!Array.isArray(products)) {
+      return NextResponse.json([], { status: 200 });
+    }
+
     return NextResponse.json(products);
   } catch (error) {
     console.error("❌ Error al obtener productos:", error);
@@ -15,100 +25,65 @@ export async function GET() {
   }
 }
 
-// 🔥 Agregar un nuevo producto
+// ✅ Método POST: Crear un nuevo producto
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    console.log("📥 Datos recibidos en API:", body);
+    const {
+      name,
+      description,
+      price,
+      categoryId,
+      images,
+      stock,
+      minStock,
+      suppliers,
+      sku,
+    } = body;
 
-    // Asegurar que los datos sean correctos antes de enviarlos a Prisma
-    const newProduct = await prisma.product.create({
+    // ✅ Validación de campos obligatorios
+    if (!name || !price || !categoryId || stock === undefined) {
+      return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 });
+    }
+
+    // ✅ Generar SKU si no se proporciona
+    const generatedSku = sku || `SKU-${uuidv4().slice(0, 8)}`;
+
+    // ✅ Crear el producto en la base de datos
+    const product = await prisma.product.create({
       data: {
-        name: body.name,
-        description: body.description || null,
-        price: Number(body.price),
-        stock: Number(body.stock),
-        categoryId: body.categoryId || null,
-        images: body.images.length > 0 ? { set: body.images } : undefined,
-        colors: body.colors.length > 0 ? { set: body.colors } : undefined,
-        sizes: body.sizes.length > 0 ? { set: body.sizes } : undefined,
-        material: body.material || null,
-        weight: body.weight ? Number(body.weight) : null,
-        dimensions: body.dimensions || null,
-        isActive: body.isActive,
-        isCustomizable: body.isCustomizable,
-        allowImageUpload: body.allowImageUpload,
-        customTextFields: body.customTextFields.some((field) => field !== "") ? { set: body.customTextFields } : undefined,
-        variants: body.variants.length > 0 ? { create: body.variants } : undefined,
+        name,
+        description,
+        price,
+        categoryId,
+        images,
+        stock,
+        minStock,
+        sku: generatedSku,
+        suppliers: {
+          create: suppliers?.map((supplier: { id: string; cost: number }) => ({
+            supplierId: supplier.id,
+            cost: supplier.cost,
+          })) || [],
+        },
+      },
+      include: { suppliers: true },
+    });
+
+    // ✅ Registrar la entrada de stock en el historial
+    await prisma.inventoryHistory.create({
+      data: {
+        productId: product.id,
+        type: "entrada",
+        quantity: stock,
+        userId: "admin", // TODO: Reemplazar con ID del usuario autenticado
+        description: "Stock inicial",
       },
     });
 
-    console.log("✅ Producto agregado:", newProduct);
-    return NextResponse.json(newProduct);
+    return NextResponse.json(product, { status: 201 });
   } catch (error) {
-    console.error("❌ Error en API:", error);
-    return NextResponse.json({ error: "Error al agregar producto" }, { status: 500 });
-  }
-}
-
-// 🔥 Actualizar un producto por ID
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  try {
-    const id = params?.id;
-    if (!id) {
-      console.error("❌ No se proporcionó un ID válido.");
-      return NextResponse.json({ error: "ID no proporcionado" }, { status: 400 });
-    }
-
-    const body = await req.json();
-    console.log("📥 Datos recibidos para actualizar:", body);
-
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: {
-        name: body.name,
-        description: body.description || null,
-        price: Number(body.price),
-        stock: Number(body.stock),
-        categoryId: body.categoryId || null,
-        images: body.images.length > 0 ? { set: body.images } : undefined,
-        colors: body.colors.length > 0 ? { set: body.colors } : undefined,
-        sizes: body.sizes.length > 0 ? { set: body.sizes } : undefined,
-        material: body.material || null,
-        weight: body.weight ? Number(body.weight) : null,
-        dimensions: body.dimensions || null,
-        isActive: body.isActive,
-        isCustomizable: body.isCustomizable,
-        allowImageUpload: body.allowImageUpload,
-        customTextFields: body.customTextFields.some((field) => field !== "") ? { set: body.customTextFields } : undefined,
-        variants: body.variants.length > 0 ? { create: body.variants } : undefined,
-      },
-    });
-
-    console.log("✅ Producto actualizado:", updatedProduct);
-    return NextResponse.json(updatedProduct);
-  } catch (error) {
-    console.error("❌ Error al actualizar producto:", error);
-    return NextResponse.json({ error: "Error al actualizar producto" }, { status: 500 });
-  }
-}
-
-// 🔥 Eliminar un producto por ID
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  try {
-    const id = params?.id;
-    if (!id) {
-      console.error("❌ No se proporcionó un ID válido.");
-      return NextResponse.json({ error: "ID no proporcionado" }, { status: 400 });
-    }
-
-    // Eliminar el producto en la base de datos
-    const deletedProduct = await prisma.product.delete({ where: { id } });
-
-    console.log("✅ Producto eliminado:", deletedProduct);
-    return NextResponse.json({ message: "Producto eliminado correctamente" });
-  } catch (error) {
-    console.error("❌ Error al eliminar producto:", error);
-    return NextResponse.json({ error: "Error al eliminar producto" }, { status: 500 });
+    console.error("❌ Error al crear el producto:", error);
+    return NextResponse.json({ error: "Error al crear el producto" }, { status: 500 });
   }
 }

@@ -1,17 +1,13 @@
+// src/app/api/invoices/[id]/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export async function GET(req: Request, context: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const invoiceId = params.id;
+
   try {
-    const { id } = context.params; // ✅ Extraemos ID de forma segura
-
-    if (!id) {
-      return NextResponse.json({ error: "ID de factura no proporcionado" }, { status: 400 });
-    }
-
     const invoice = await prisma.invoice.findUnique({
-      where: { id },
-      include: { items: true }, // ✅ Aseguramos que los items se incluyan
+      where: { id: invoiceId },
     });
 
     if (!invoice) {
@@ -21,6 +17,18 @@ export async function GET(req: Request, context: { params: { id: string } }) {
     return NextResponse.json(invoice);
   } catch (error) {
     console.error("❌ Error al obtener la factura:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    return NextResponse.json({ error: "Error al obtener la factura" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  const invoiceId = params.id;
+
+  try {
+    await prisma.invoice.delete({ where: { id: invoiceId } });
+    return NextResponse.json({ message: "Factura eliminada correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar la factura:", error);
+    return NextResponse.json({ error: "Error al eliminar la factura" }, { status: 500 });
   }
 }

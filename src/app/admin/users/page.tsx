@@ -1,13 +1,22 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "cliente";
+  isActive: boolean;
+}
+
 export default function UsersPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(25); // 🔢 Opciones: 25, 50, 100, 200
+  const [users, setUsers] = useState<User[]>([]);
+  const [search, setSearch] = useState<string>("");
+  const [roleFilter, setRoleFilter] = useState<"" | "admin" | "cliente">("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(25); // 🔢 Opciones: 25, 50, 100, 200
 
   useEffect(() => {
     fetchUsers();
@@ -17,7 +26,7 @@ export default function UsersPage() {
     try {
       const res = await fetch("/api/users");
       if (!res.ok) throw new Error("No se pudieron obtener los usuarios.");
-      const data = await res.json();
+      const data: User[] = await res.json();
       setUsers(data);
     } catch (error) {
       console.error("❌ Error al cargar los usuarios:", error);
@@ -26,9 +35,10 @@ export default function UsersPage() {
 
   const filteredUsers = users.filter((user) => {
     return (
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase())
-    ) && (roleFilter ? user.role === roleFilter : true);
+      (user.name.toLowerCase().includes(search.toLowerCase()) ||
+        user.email.toLowerCase().includes(search.toLowerCase())) &&
+      (roleFilter ? user.role === roleFilter : true)
+    );
   });
 
   // 📌 Paginación
@@ -54,7 +64,7 @@ export default function UsersPage() {
         <select
           className="border p-2 rounded"
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(e) => setRoleFilter(e.target.value as "" | "admin" | "cliente")}
         >
           <option value="">Todos los roles</option>
           <option value="admin">Administrador</option>
@@ -112,7 +122,7 @@ export default function UsersPage() {
         <button
           className="bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50"
           disabled={currentPage === 1}
-          onClick={() => setCurrentPage(currentPage - 1)}
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
         >
           ⬅️ Anterior
         </button>
@@ -121,8 +131,8 @@ export default function UsersPage() {
         </span>
         <button
           className="bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50"
-          disabled={currentPage === totalPages}
-          onClick={() => setCurrentPage(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
         >
           Siguiente ➡️
         </button>
@@ -132,7 +142,7 @@ export default function UsersPage() {
       <div className="mt-6">
         <Link
           href="/admin/users/add"
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 inline-block"
         >
           ➕ Añadir Usuario
         </Link>
